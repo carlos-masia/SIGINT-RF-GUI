@@ -1,65 +1,74 @@
 # SIGINT-RF-GUI
 
-Desktop **GUI** workspace for SIGINT RF applications. Instrument drivers and waveform logic stay in the sibling **device** repository so this tree can focus on UI and orchestration.
+**Shiny** web UI for the SMW200A **ARB catalog** workflow (same idea as `smw200a_arb_signals.py --gui` in the device repo). Instrument code, `rs_scpi_tcp`, and the Tk smoke test live in **`SIGINT-RF-DEVICE-VSG_SMW200A`** — this repo only ships `vsg_gui.py` plus packaging.
 
-## Relationship to `SIGINT-RF-DEVICE-VSG_SMW200A`
+## What lives where
 
-The SMW200A **RsSmw wrapper** and ARB tooling live next door:
+| Piece | Location |
+|-------|----------|
+| Shiny app | `SIGINT-RF-GUI/SIGINT-RF-GUI/vsg_gui.py` → console script **`sigint-rf-gui-shiny`** |
+| `VsgSmw200a`, `smw200a_arb_signals`, `rs_scpi_tcp`, minimal Tk VISA smoke | **`SIGINT-RF-DEVICE-VSG_SMW200A`** (installed as a dependency from git, or clone sibling under `iceye/`) |
 
-`../SIGINT-RF-DEVICE-VSG_SMW200A`
+Expected layout when running from a checkout (no editable device install):
 
-Keep both repos under the same parent folder (for example `iceye/SIGINT-RF-GUI` and `iceye/SIGINT-RF-DEVICE-VSG_SMW200A`). `vsg_bridge.py` resolves that path at import time and loads:
-
-`../SIGINT-RF-DEVICE-VSG_SMW200A/SIGINT-RF-DEVICE-VSG_SMW200A/vsg_smw200a.py`
-
-## `vsg_bridge.py`
-
-`SIGINT-RF-GUI/SIGINT-RF-GUI/vsg_bridge.py` is **not** a second copy of the driver. It re-exports the device API so the GUI does not need manual `sys.path` edits.
-
-```python
-from vsg_bridge import VsgSmw200a, is_rs_smw_installed
+```text
+iceye/
+  SIGINT-RF-GUI/
+  SIGINT-RF-DEVICE-VSG_SMW200A/
+    SIGINT-RF-DEVICE-VSG_SMW200A/
+      smw200a_arb_signals.py
+      vsg_smw200a.py
+      rs_scpi_tcp.py
+      vsg_config.yaml
 ```
 
-Quick hardware check (runs the device module’s CLI; uses `vsg_config.yaml` in the device folder and `SMW_*` env overrides — see device README):
+`vsg_gui.py` resolves `iceye/` from the script path and loads the ARB module from that sibling folder. **`import rs_scpi_tcp`** uses the device copy (includes `smw_query_idn` for **Test SMW**).
+
+## Tk: minimal VISA / `*IDN?` window
+
+Use the **device** package entry point (not this repo):
 
 ```powershell
-cd SIGINT-RF-GUI\SIGINT-RF-GUI
-python vsg_bridge.py
+pip install -e path/to/SIGINT-RF-DEVICE-VSG_SMW200A
+sigint-rf-vsg-tk
+```
+
+That runs `vsg_tk_smoke.py` next to `vsg_smw200a.py` (`from vsg_smw200a import VsgSmw200a`, …).
+
+## Run the Shiny GUI
+
+From the **SIGINT-RF-GUI** repo root:
+
+```powershell
+cd SIGINT-RF-GUI
+pip install -e .
+sigint-rf-gui-shiny
+```
+
+Or from the `iceye` root:
+
+```powershell
+python -m shiny run --reload SIGINT-RF-GUI/SIGINT-RF-GUI/vsg_gui.py:app
 ```
 
 ## Requirements
 
-- **Python** ≥ 3.10 (align with the device project).
-- **RsSmw**, **PyYAML**, and a **VISA** stack on the PC when using `VsgSmw200a` (YAML loads `../SIGINT-RF-DEVICE-VSG_SMW200A/.../vsg_config.yaml`).
-
-```powershell
-cd SIGINT-RF-GUI\SIGINT-RF-GUI
-pip install -r requirements.txt
-```
-
-You can instead install the device project in editable mode (pulls the same dependencies and documents the full toolset):
-
-```powershell
-pip install -e ..\SIGINT-RF-DEVICE-VSG_SMW200A
-```
+See `pyproject.toml`: Python **≥ 3.14.5**, **Shiny**, **RsSmw**, **PyYAML**, and the **SIGINT-RF-DEVICE-VSG_SMW200A** dependency (git pin). VISA on the PC when using `play()` / `VsgSmw200a`.
 
 ## Layout
 
-```
+```text
 SIGINT-RF-GUI/
   pyproject.toml
-  README.md                    # this file
+  README.md
   SIGINT-RF-GUI/
-    vsg_bridge.py              # bridge to device vsg_smw200a.py (reads device vsg_config.yaml)
-    requirements.txt
+    vsg_gui.py
 ```
-
-Add new UI entrypoints and packages under `SIGINT-RF-GUI/SIGINT-RF-GUI/` (or introduce a `src/` layout when the application grows).
 
 ## Further reading
 
-See **`../SIGINT-RF-DEVICE-VSG_SMW200A/README.md`** for ARB catalog usage (`smw200a_arb_signals.py`), the SCPI/TCP tool (`rs_smw_fsw_tcp.py`), and `rs_scpi_tcp` expectations.
+**`../SIGINT-RF-DEVICE-VSG_SMW200A/README.md`** — ARB catalog, YAML, `rs_smw_fsw_tcp`, and packaging for the device repo.
 
 ## License
 
-MIT (see `pyproject.toml` if specified).
+MIT (see `pyproject.toml`).

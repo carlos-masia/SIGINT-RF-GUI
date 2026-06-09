@@ -2,15 +2,14 @@
 requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
-# Poetry only installs dependencies here; there is no Python package folder named
-# sigint_rf_device_vsg_smw200a (scripts live under SIGINT-RF-DEVICE-VSG_SMW200A/).
+# Poetry: install dependencies only (no importable top-level package named like the project).
 [tool.poetry]
 package-mode = false
 
 [project]
 name = "SIGINT-RF-GUI"
 version = "0.1.0"
-description = "R&S SMW200A ARB catalog (RsSmw), VSG driver (vsg_smw200a), and SMW/FSW SCPI-over-TCP GUI (rs_smw_fsw_tcp)."
+description = "SIGINT RF Shiny GUI for SMW200A ARB catalog; uses SIGINT-RF-DEVICE-VSG_SMW200A for instruments and SCPI/TCP."
 requires-python = ">=3.14.5"
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,12 +19,13 @@ classifiers = [
     "Private :: Do Not Upload",
 ]
 
-# Runtime: smw200a_arb_signals.py, vsg_smw200a.py (numpy + RsSmw; tkinter is stdlib).
-# rs_smw_fsw_tcp.py is stdlib + tkinter only, but the ARB stack needs the same env.
+# Device package (git) supplies vsg_smw200a, smw200a_arb_signals, rs_scpi_tcp, Tk smoke (sigint-rf-vsg-tk).
 dependencies = [
-    "numpy==2.4.6",
-    "RsSmw==5.50.42",
-    "PyYAML==6.0.1",
+    "numpy>=1.24",
+    "RsSmw>=5.0.44",
+    "PyYAML>=6.0.1",
+    "SIGINT-RF-DEVICE-VSG_SMW200A @ git+https://github.com/carlos-masia/SIGINT-RF-DEVICE-VSG_SMW200A.git@v0.1.0",
+    "shiny ==1.6.3",
 ]
 
 [project.optional-dependencies]
@@ -37,9 +37,14 @@ dev = [
     "mypy==1.5",
 ]
 
+[project.scripts]
+sigint-rf-gui-shiny = "vsg_gui:main"
+
 [tool.setuptools]
-# Repo root module; inner-folder scripts (smw200a_arb_signals, vsg_smw200a) are run as files or via PYTHONPATH.
-py-modules = ["rs_smw_fsw_tcp"]
+py-modules = ["vsg_gui"]
+
+[tool.setuptools.package-dir]
+"" = "SIGINT-RF-GUI"
 
 [tool.black]
 line-length = 100
