@@ -1,1 +1,3 @@
 .venv
+_tmp_signal.wv
+SIGINT-RF-GUI/__pycache__/

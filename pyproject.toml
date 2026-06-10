@@ -24,7 +24,7 @@ dependencies = [
     "numpy>=1.24",
     "RsSmw>=5.0.44",
     "PyYAML>=6.0.1",
-    "SIGINT-RF-DEVICE-VSG_SMW200A @ git+https://github.com/carlos-masia/SIGINT-RF-DEVICE-VSG_SMW200A.git@v0.1.0",
+    "SIGINT-RF-DEVICE-VSG_SMW200A @ git+https://github.com/carlos-masia/SIGINT-RF-DEVICE-VSG_SMW200A.git@v0.1.2",
     "shiny ==1.6.3",
 ]
 

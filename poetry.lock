@@ -92,7 +92,7 @@ description = "Composable command line interface toolkit"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"dev\" or platform_system != \"Emscripten\""
+markers = "platform_system != \"Emscripten\" or extra == \"dev\""
 files = [
     {file = "click-8.4.1-py3-none-any.whl", hash = "sha256:482be17c6991b8c19c5429a1e995d9b0efdbb63172824c41f99965dc0ade8ec2"},
     {file = "click-8.4.1.tar.gz", hash = "sha256:918b5633eddf6b41c32d4f454bf0de810065c74e3f7dbf8ee5452f8be88d3e96"},
@@ -1037,8 +1037,8 @@ providers = ["anthropic ; python_version >= \"3.11\"", "chatlas[mcp] (>=0.17.0)"
 
 [[package]]
 name = "sigint-rf-device-vsg-smw200a"
-version = "0.1.0"
-description = "R&S SMW200A ARB catalog (RsSmw), VSG driver (vsg_smw200a), and SMW/FSW SCPI-over-TCP GUI (rs_smw_fsw_tcp)."
+version = "0.1.2"
+description = "R&S SMW200A ARB catalog (RsSmw), VSG driver (vsg_smw200a), SCPI/TCP helpers (rs_scpi_tcp), Tk tools (rs_smw_fsw_tcp, vsg_tk_smoke)."
 optional = false
 python-versions = ">=3.14.5"
 groups = ["main"]
@@ -1056,8 +1056,8 @@ dev = ["black (>=24.0)", "mypy (==1.5)", "pytest (==7.4)", "pytest-cov (==4.1)",
 [package.source]
 type = "git"
 url = "https://github.com/carlos-masia/SIGINT-RF-DEVICE-VSG_SMW200A.git"
-reference = "v0.1.0"
-resolved_reference = "447e7876b690d1637b8cd250cf7e89b4818e8a37"
+reference = "v0.1.2"
+resolved_reference = "88fb307d4d72dfaa3570560b2b39884c5647144a"
 
 [[package]]
 name = "starlette"
@@ -1335,4 +1335,4 @@ dev = ["black", "mypy", "pytest", "pytest-cov", "ruff"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14.5"
-content-hash = "4378f352cef497d1579f63aae945b6a502d37fd4f22b7b30e732959b5bdb5432"
+content-hash = "4ffe9413451ecbc32a2ed68b51a7fa340e37e38dbbb2a47de6d73af59a74b46b"
