@@ -10,22 +10,21 @@ package-mode = false
 name = "SIGINT-RF-GUI"
 version = "0.1.0"
 description = "SIGINT RF Shiny GUI for SMW200A ARB catalog; uses SIGINT-RF-DEVICE-VSG_SMW200A for instruments and SCPI/TCP."
-requires-python = ">=3.14.5"
+requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }
 keywords = ["smw200a", "vsg", "scpi", "rohde-schwarz", "sigint", "arb"]
 classifiers = [
-    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.12",
     "Private :: Do Not Upload",
 ]
 
-# Device package (git) supplies vsg_smw200a, smw200a_arb_signals, rs_scpi_tcp, Tk smoke (sigint-rf-vsg-tk).
+# Device package (git) supplies vsg_smw200a, rs_scpi_tcp, Tk smoke (sigint-rf-vsg-tk).
 dependencies = [
-    "numpy>=1.24",
-    "RsSmw>=5.0.44",
-    "PyYAML>=6.0.1",
-    "SIGINT-RF-DEVICE-VSG_SMW200A @ git+https://github.com/carlos-masia/SIGINT-RF-DEVICE-VSG_SMW200A.git@v0.1.2",
-    "shiny ==1.6.3",
+    "numpy==2.4.6",
+    "RsSmw==5.50.42",
+    "SIGINT-RF-DEVICE-VSG_SMW200A @ git+https://github.com/carlos-masia/SIGINT-RF-DEVICE-VSG_SMW200A.git@v0.1.3",
+    "shiny==1.6.3",
 ]
 
 [project.optional-dependencies]
@@ -48,14 +47,14 @@ py-modules = ["vsg_gui"]
 
 [tool.black]
 line-length = 100
-target-version = ["py314"]
+target-version = ["py312"]
 [tool.ruff]
 line-length = 100
-target-version = "py314"
+target-version = "py312"
 select = ["E", "F", "W"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true

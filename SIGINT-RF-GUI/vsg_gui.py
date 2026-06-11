@@ -22,32 +22,26 @@ from typing import Any
 
 from shiny import App, reactive, render, ui
 
+try:
+    import vsg_smw200a as _vsg
+    from vsg_smw200a import (
+        CATALOG,
+        format_gen_default_for_entry,
+        list_generator_param_specs,
+        parse_gen_param_value,
+        play,
+        resolve_instr_addr,
+    )
+    _ARB_LOAD_ERROR: str | None = None
+except Exception as _exc:
+    _ARB_LOAD_ERROR = "".join(traceback.format_exception(type(_exc), _exc, _exc.__traceback__))
+    CATALOG = {}  # type: ignore[assignment]
+
 __all__ = ("app", "main")
 
 
 # ---------------------------------------------------------------------------
-# ARB module  (vsg_smw200a from installed device package)
-# ---------------------------------------------------------------------------
-
-_arb: Any | None = None
-_arb_load_error: str | None = None
-
-
-def _load_arb() -> tuple[Any | None, str | None]:
-    global _arb, _arb_load_error
-    if _arb is not None:
-        return _arb, None
-    try:
-        import vsg_smw200a as _mod
-        _arb = _mod
-        _arb_load_error = None
-    except Exception as exc:
-        _arb_load_error = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    return _arb, _arb_load_error
-
-
-# ---------------------------------------------------------------------------
-# Config helpers (vsg_smw200a — installed with the device package)
+# Config helpers
 # ---------------------------------------------------------------------------
 
 def _default_smw_ip_str() -> str:
@@ -59,27 +53,8 @@ def _default_smw_ip_str() -> str:
     #     return "192.168.0.10"
 
 
-def _default_fsw_ip_str() -> str:
-    try:
-        import vsg_smw200a
-        return vsg_smw200a._fsw_ip_from_vsg_yaml() or ""
-    except Exception:
-        return ""
-
-
-def _arb_config_path_str() -> str:
-    try:
-        from vsg_smw200a import config_file_path
-        return str(config_file_path())
-    except Exception:
-        return "(vsg_config.yaml — not found)"
-
-
 def _catalog_choices() -> list[str]:
-    arb, _ = _load_arb()
-    if arb is None:
-        return []
-    return sorted(arb.CATALOG.keys())
+    return sorted(CATALOG.keys())
 
 
 def _sanitize_gp_id(name: str) -> str:
@@ -122,9 +97,14 @@ def _log_append(line: str) -> None:
 # ---------------------------------------------------------------------------
 
 def app_ui(request: Any | None = None) -> ui.Tag:
-    _load_arb()
     choices = _catalog_choices()
-    load_err = _arb_load_error
+    load_err = _ARB_LOAD_ERROR
+
+    # Pre-fill RF fields with first catalog entry
+    first_signal = choices[0] if choices else None
+    first_entry = CATALOG.get(first_signal) if first_signal else None
+    init_rf_mhz = f"{first_entry.carrier_hz / 1e6:.3f}" if first_entry else ""
+    init_rf_dbm = str(first_entry.power_dbm) if first_entry else ""
 
     banner = (
         ui.tags.p(
@@ -143,64 +123,59 @@ def app_ui(request: Any | None = None) -> ui.Tag:
         )
     )
 
-    return ui.page_fluid(
-        ui.h2("R&S SMW200A — ARB catalog (Shiny)"),
-        banner,
-        ui.tags.pre(load_err, style="max-height:180px;overflow:auto;font-size:11px;")
-        if load_err
-        else None,
-        ui.layout_columns(
-            ui.card(
-                ui.card_header("Connection"),
-                ui.input_text("instr_visa", "VISA override (optional)", value="", width="100%"),
-                ui.input_text(
-                    "smw_ip",
-                    "SMW IP (HiSLIP/socket from vsg_config.yaml if empty)",
-                    value=_default_smw_ip_str(),
+    return ui.page_navbar(
+        ui.nav_panel(
+            "VSG — SMW200A",
+            banner,
+            ui.tags.pre(load_err, style="max-height:180px;overflow:auto;font-size:11px;")
+            if load_err
+            else None,
+            ui.layout_columns(
+                ui.card(
+                    ui.card_header("Connection"),
+                    ui.input_text(
+                        "smw_ip",
+                        "SMW IP",
+                        value=_default_smw_ip_str(),
+                    ),
+                    ui.layout_columns(
+                        ui.input_numeric("smw_scpi_port", "SCPI TCP port", value=5025, min=1, max=65535),
+                        ui.input_numeric("smw_timeout", "Timeout (s)", value=15, min=1, max=300),
+                    ),
+                    ui.input_action_button("btn_scpi_idn", "Test SMW (SCPI TCP *IDN?)", class_="btn-secondary"),
                 ),
-                ui.input_numeric("smw_scpi_port", "SMW SCPI TCP port (*IDN?)", value=5025, min=1, max=65535),
-                ui.input_action_button("btn_scpi_idn", "Test SMW (SCPI TCP *IDN?)", class_="btn-secondary"),
-                ui.input_text("fsw_ip", "FSW IP", value=_default_fsw_ip_str()),
-                ui.layout_columns(
-                    ui.input_numeric("fsw_port", "FSW port", value=5025, min=1, max=65535),
-                    ui.input_numeric("fsw_timeout", "Socket timeout (s)", value=15, min=1, max=300),
+                ui.card(
+                    ui.card_header("Signal"),
+                    ui.input_select(
+                        "signal",
+                        "Catalog signal",
+                        choices=choices if choices else {"": "(ARB module not loaded)"},
+                        selected=choices[0] if choices else "",
+                    ),
+                    ui.input_checkbox("dry_run", "Dry-run (.wv only, no upload / no RF)", value=False),
+                    ui.layout_columns(
+                    ui.input_text("rf_mhz", "RF carrier MHz", value=init_rf_mhz),
+                    ui.input_text("rf_dbm", "RF power dBm", value=init_rf_dbm),
+                    ),
                 ),
-                ui.p(ui.tags.small(ui.tags.code(f"vsg_config: {_arb_config_path_str()}"))),
+                col_widths=(6, 6),
             ),
             ui.card(
-                ui.card_header("Signal & FSW"),
-                ui.input_select(
-                    "signal",
-                    "Catalog signal",
-                    choices=choices if choices else {"": "(ARB module not loaded)"},
-                    selected=choices[0] if choices else "",
-                ),
-                ui.input_checkbox("dry_run", "Dry-run (.wv only, no upload / no RF)", value=False),
-                ui.layout_columns(
-                    ui.input_text("rf_mhz", "RF carrier MHz (empty = catalog)", value=""),
-                    ui.input_text("rf_dbm", "RF power dBm (empty = catalog)", value=""),
-                ),
-                ui.layout_columns(
-                    ui.input_text("fsw_span_hz", "FSW span Hz (empty = auto)", value=""),
-                    ui.input_text("fsw_ref_dbm", "FSW ref dBm (empty = auto)", value=""),
-                    ui.input_text("fsw_ch", "FSW ch", value="1"),
-                ),
+                ui.card_header("Waveform parameters (I/Q generator)"),
+                ui.output_ui("dyn_gen_params"),
             ),
-            col_widths=(6, 6),
+            ui.layout_columns(
+                ui.input_action_button("btn_play", "Generate & apply", class_="btn-primary"),
+                ui.input_action_button("btn_list", "List catalog in log", class_="btn-secondary"),
+                col_widths=(6, 6),
+            ),
+            ui.card(
+                ui.card_header("Log"),
+                ui.output_ui("log_area"),
+            ),
         ),
-        ui.card(
-            ui.card_header("Waveform parameters (I/Q generator)"),
-            ui.output_ui("dyn_gen_params"),
-        ),
-        ui.layout_columns(
-            ui.input_action_button("btn_play", "Generate & apply (SMW + optional FSW)", class_="btn-primary"),
-            ui.input_action_button("btn_list", "List catalog in log", class_="btn-secondary"),
-            col_widths=(6, 6),
-        ),
-        ui.card(
-            ui.card_header("Log"),
-            ui.output_ui("log_area"),
-        ),
+        title="SIGINT-RF",
+        id="main_tabs",
     )
 
 
@@ -211,6 +186,18 @@ def app_ui(request: Any | None = None) -> ui.Tag:
 def server(input: Any, output: Any, session: Any) -> None:
     log_tick = reactive.value(0)
     drain_tick = reactive.value(0)
+
+    @reactive.effect
+    @reactive.event(input.signal)
+    def _prefill_rf_from_catalog() -> None:
+        if not CATALOG:
+            return
+        sig = input.signal()
+        entry = CATALOG.get(sig)
+        if entry is None:
+            return
+        ui.update_text("rf_mhz", value=f"{entry.carrier_hz / 1e6:.3f}")
+        ui.update_text("rf_dbm", value=str(entry.power_dbm))
 
     def touch_log() -> None:
         with _log_ui_lock:
@@ -242,19 +229,18 @@ def server(input: Any, output: Any, session: Any) -> None:
             reactive.invalidate_later(0.12)
 
     @reactive.calc
-    def arb_mod() -> tuple[Any | None, str | None]:
-        return _load_arb()
+    def arb_ok() -> bool:
+        return _ARB_LOAD_ERROR is None and bool(CATALOG)
 
     @render.ui
     def dyn_gen_params() -> ui.Tag:
-        arb, err = arb_mod()
-        if err or arb is None:
+        if not arb_ok():
             return ui.p("(ARB module not loaded.)", class_="text-muted")
         name = input.signal()
-        if not name or name not in arb.CATALOG:
+        if not name or name not in CATALOG:
             return ui.p("(Select a catalog signal.)", class_="text-muted")
-        entry = arb.CATALOG[name]
-        specs = arb.list_generator_param_specs(entry)
+        entry = CATALOG[name]
+        specs = list_generator_param_specs(entry)
         if not specs:
             return ui.p("(no editable parameters)", class_="text-muted")
         rows = []
@@ -263,7 +249,7 @@ def server(input: Any, output: Any, session: Any) -> None:
             rows.append(
                 ui.layout_columns(
                     ui.tags.span(spec.label, class_="fw-bold"),
-                    ui.input_text(sid, "", value=arb.format_gen_default_for_entry(spec), width="100%"),
+                    ui.input_text(sid, "", value=format_gen_default_for_entry(spec), width="100%"),
                     col_widths=(3, 9),
                 )
             )
@@ -283,9 +269,9 @@ def server(input: Any, output: Any, session: Any) -> None:
         t = (s or "").strip()
         return None if not t else float(t)
 
-    def _collect_gen_kwargs(arb: Any, signal_name: str) -> dict[str, Any]:
-        entry = arb.CATALOG[signal_name]
-        specs = arb.list_generator_param_specs(entry)
+    def _collect_gen_kwargs(signal_name: str) -> dict[str, Any]:
+        entry = CATALOG[signal_name]
+        specs = list_generator_param_specs(entry)
         out: dict[str, Any] = {}
         for spec in specs:
             sid = f"gp_{_sanitize_gp_id(spec.name)}"
@@ -293,20 +279,19 @@ def server(input: Any, output: Any, session: Any) -> None:
                 raw = str(input[sid]())
             except Exception:
                 raw = ""
-            out[spec.name] = arb.parse_gen_param_value(spec, raw)
+            out[spec.name] = parse_gen_param_value(spec, raw)
         return out
 
     @reactive.effect
     @reactive.event(input.btn_list)
     def _on_list() -> None:
-        arb, err = arb_mod()
         _log_clear()
-        if err or arb is None:
-            _log_append(err or "ARB not loaded.")
+        if not arb_ok():
+            _log_append(_ARB_LOAD_ERROR or "ARB not loaded.")
             touch_log()
             return
         _log_append("Available signals (ARB I/Q [P], B9+K515+K527):")
-        for k, e in arb.CATALOG.items():
+        for k, e in CATALOG.items():
             _log_append(f"  {k:14s} {e.carrier_hz / 1e6:10.3f} MHz  {e.power_dbm:>4} dBm  {e.description}")
             _log_append(f"       {e.permanent_delivery}")
             if e.trial_native:
@@ -321,7 +306,7 @@ def server(input: Any, output: Any, session: Any) -> None:
         ip = str(input.smw_ip()).strip()
         try:
             port = int(input.smw_scpi_port())
-            timeout = float(input.fsw_timeout())
+            timeout = float(input.smw_timeout())
         except (TypeError, ValueError):
             port = 5025
             timeout = 15.0
@@ -352,30 +337,17 @@ def server(input: Any, output: Any, session: Any) -> None:
     @reactive.effect
     @reactive.event(input.btn_play)
     def _on_play() -> None:
-        arb, err = arb_mod()
-        if err or arb is None:
-            ui.notification_show(err or "ARB not loaded.", duration=12, type="error")
+        if not arb_ok():
+            ui.notification_show(_ARB_LOAD_ERROR or "ARB not loaded.", duration=12, type="error")
             return
         name = str(input.signal()).strip()
-        if not name or name not in arb.CATALOG:
+        if not name or name not in CATALOG:
             ui.notification_show("Select a valid catalog signal.", duration=6, type="warning")
             return
 
-        instr = str(input.instr_visa()).strip() or None
         smw_ip = str(input.smw_ip()).strip() or None
-        fsw_ip = str(input.fsw_ip()).strip() or None
         try:
-            fsw_port = int(input.fsw_port())
-            fsw_ch = int(str(input.fsw_ch()).strip())
-        except ValueError:
-            ui.notification_show("FSW port and FSW ch must be integers.", duration=8, type="error")
-            return
-        try:
-            fsw_timeout_s = float(input.fsw_timeout())
-        except (TypeError, ValueError):
-            fsw_timeout_s = 15.0
-        try:
-            gen_kwargs = _collect_gen_kwargs(arb, name)
+            gen_kwargs = _collect_gen_kwargs(name)
         except ValueError as exc:
             ui.notification_show(str(exc), duration=10, type="error")
             return
@@ -384,9 +356,7 @@ def server(input: Any, output: Any, session: Any) -> None:
         rf_dbm = _parse_opt_float(str(input.rf_dbm()))
         carrier_hz = None if rf_mhz is None else float(rf_mhz) * 1e6
         power_dbm = rf_dbm
-        fsw_span = _parse_opt_float(str(input.fsw_span_hz()))
-        fsw_ref = _parse_opt_float(str(input.fsw_ref_dbm()))
-        addr = arb.resolve_instr_addr(instr, smw_ip)
+        addr = resolve_instr_addr(None, smw_ip)
         dry = bool(input.dry_run())
 
         _log_clear()
@@ -400,19 +370,13 @@ def server(input: Any, output: Any, session: Any) -> None:
                     _log_thread_queue.put(msg)
 
                 emit(f"VISA: {addr}")
-                arb.play(
+                play(
                     name,
                     dry_run=dry,
                     instr_addr=addr,
                     carrier_hz=carrier_hz,
                     power_dbm=power_dbm,
                     gen_kwargs=gen_kwargs,
-                    fsw_ip=fsw_ip,
-                    fsw_port=fsw_port,
-                    fsw_timeout_s=fsw_timeout_s,
-                    fsw_span_hz=fsw_span,
-                    fsw_ref_dbm=fsw_ref,
-                    fsw_ch=fsw_ch,
                     log=emit,
                 )
                 emit("Done.")

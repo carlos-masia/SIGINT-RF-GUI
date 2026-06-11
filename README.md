@@ -1,59 +1,58 @@
 # SIGINT-RF-GUI
 
-**Shiny** web UI for the SMW200A **ARB catalog** workflow (same idea as `smw200a_arb_signals.py --gui` in the device repo). Instrument code, `rs_scpi_tcp`, and the Tk smoke test live in **`SIGINT-RF-DEVICE-VSG_SMW200A`** — this repo only ships `vsg_gui.py` plus packaging.
+Shiny web GUI for the SMW200A ARB catalog.
+All instrument logic (`CATALOG`, `play()`, generators, `rs_scpi_tcp`) lives in the sibling package **`SIGINT-RF-DEVICE-VSG_SMW200A`** — this repo only ships `vsg_gui.py` and its Shiny packaging.
 
-## What lives where
+---
 
-| Piece | Location |
-|-------|----------|
-| Shiny app | `SIGINT-RF-GUI/SIGINT-RF-GUI/vsg_gui.py` → console script **`sigint-rf-gui-shiny`** |
-| `VsgSmw200a`, `smw200a_arb_signals`, `rs_scpi_tcp`, minimal Tk VISA smoke | **`SIGINT-RF-DEVICE-VSG_SMW200A`** (installed as a dependency from git, or clone sibling under `iceye/`) |
-
-Expected layout when running from a checkout (no editable device install):
-
-```text
-iceye/
-  SIGINT-RF-GUI/
-  SIGINT-RF-DEVICE-VSG_SMW200A/
-    SIGINT-RF-DEVICE-VSG_SMW200A/
-      smw200a_arb_signals.py
-      vsg_smw200a.py
-      rs_scpi_tcp.py
-      vsg_config.yaml
-```
-
-`vsg_gui.py` resolves `iceye/` from the script path and loads the ARB module from that sibling folder. **`import rs_scpi_tcp`** uses the device copy (includes `smw_query_idn` for **Test SMW**).
-
-## Tk: minimal VISA / `*IDN?` window
-
-Use the **device** package entry point (not this repo):
+## Quick start
 
 ```powershell
-pip install -e path/to/SIGINT-RF-DEVICE-VSG_SMW200A
-sigint-rf-vsg-tk
-```
+# 1. Create virtual environment at the repo root
+python -m venv .venv
 
-That runs `vsg_tk_smoke.py` next to `vsg_smw200a.py` (`from vsg_smw200a import VsgSmw200a`, …).
+# 2. Allow script execution (only needed once per machine)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-## Run the Shiny GUI
+# 3. Activate the virtual environment
+.\.venv\Scripts\activate
 
-From the **SIGINT-RF-GUI** repo root:
+# 4. Install Poetry (package manager)
+pip install poetry
 
-```powershell
-cd SIGINT-RF-GUI
-pip install -e .
+# 5. Install all pinned dependencies from pyproject.toml
+poetry install
+
+# 6. Launch the GUI
 sigint-rf-gui-shiny
 ```
 
-Or from the `iceye` root:
+> The device package (`SIGINT-RF-DEVICE-VSG_SMW200A`) is declared as a git dependency in `pyproject.toml` and is installed automatically by `poetry install` — no manual step needed.
+
+Or with live reload during development:
 
 ```powershell
 python -m shiny run --reload SIGINT-RF-GUI/SIGINT-RF-GUI/vsg_gui.py:app
 ```
 
-## Requirements
+---
 
-See `pyproject.toml`: Python **≥ 3.14.5**, **Shiny**, **RsSmw**, **PyYAML**, and the **SIGINT-RF-DEVICE-VSG_SMW200A** dependency (git pin). VISA on the PC when using `play()` / `VsgSmw200a`.
+## Module map
+
+```mermaid
+graph LR
+    SH["vsg_gui.py\n(Shiny app)"]
+
+    subgraph Device["SIGINT-RF-DEVICE-VSG_SMW200A (installed)"]
+        VSG["vsg_smw200a\nCATALOG · play() · VsgSmw200a"]
+        SCPI["rs_scpi_tcp\nsmw_query_idn"]
+    end
+
+    SH -->|"CATALOG · play()\nresolve_instr_addr"| VSG
+    SH -->|"Test SMW button"| SCPI
+```
+
+---
 
 ## Layout
 
@@ -62,13 +61,25 @@ SIGINT-RF-GUI/
   pyproject.toml
   README.md
   SIGINT-RF-GUI/
-    vsg_gui.py
+    vsg_gui.py     ← Shiny app  (console script: sigint-rf-gui-shiny)
 ```
 
-## Further reading
+---
 
-**`../SIGINT-RF-DEVICE-VSG_SMW200A/README.md`** — ARB catalog, YAML, `rs_smw_fsw_tcp`, and packaging for the device repo.
+## Adding signals / modulations
+
+See **[`../SIGINT-RF-DEVICE-VSG_SMW200A/README.md`](../SIGINT-RF-DEVICE-VSG_SMW200A/README.md)** — *Adding a new signal* section.
+New signals appear automatically in the GUI dropdown once added to the device package `CATALOG`.
+
+---
+
+## Requirements
+
+Python ≥ 3.12, **Shiny**, **RsSmw** + VISA runtime (for `play()`).
+See `pyproject.toml` for pinned versions.
+
+---
 
 ## License
 
-MIT (see `pyproject.toml`).
+MIT — see `pyproject.toml`.
